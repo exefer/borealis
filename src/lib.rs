@@ -108,4 +108,11 @@ static INIT: unsafe extern "C" fn() = init;
 
 unsafe extern "C" fn init() {
     eprintln!("libborealis loaded");
+
+    let module = find_main_module().unwrap();
+
+    let first_match_offset = 0x5638;
+    let first_match_addr = (module.base + first_match_offset) as *mut u8;
+
+    patch_memory(first_match_addr, &[0x64; 0x2A]);
 }
