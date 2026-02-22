@@ -101,6 +101,29 @@ unsafe fn find_main_module() -> Option<Module> {
     module
 }
 
+unsafe fn write_abs_jump(src: *mut u8, dst: *const u8) {
+    let mut patch = [0u8; 12];
+
+    // mov rax, imm64
+    patch[0] = 0x48;
+    patch[1] = 0xB8;
+
+    // imm64 LE
+    patch[2..10].copy_from_slice(&(dst as u64).to_le_bytes());
+
+    // jmp rax
+    patch[10] = 0xFF;
+    patch[11] = 0xE0;
+
+    patch_memory(src, &patch);
+}
+
+fn ask() -> String {
+    println!("detoured ask");
+
+    "3".to_owned()
+}
+
 // Auto-run on library load
 #[used]
 #[link_section = ".init_array"]
@@ -108,4 +131,11 @@ static INIT: unsafe extern "C" fn() = init;
 
 unsafe extern "C" fn init() {
     eprintln!("libborealis loaded");
+
+    let module = find_main_module().unwrap();
+
+    let ask_offset = 0x614C0;
+    let ask_addr = (module.base + ask_offset) as *mut u8;
+
+    write_abs_jump(ask_addr, ask as *const u8);
 }
