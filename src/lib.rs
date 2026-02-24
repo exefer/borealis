@@ -101,6 +101,28 @@ unsafe fn find_main_module() -> Option<Module> {
     module
 }
 
+// SIGSEGV
+unsafe fn write_rel_jump(src: *mut u8, dst: *const u8) {
+    let mut patch = [0u8; 5];
+
+    // rel32
+    let rel = (dst as isize) - (src as isize + 5);
+
+    // jmp rel32
+    patch[0] = 0xE9;
+
+    // rel32 LE
+    patch[1..5].copy_from_slice(&(rel as i32).to_le_bytes());
+
+    patch_memory(src, &patch);
+}
+
+fn ask() -> String {
+    println!("detoured ask");
+
+    "3".to_owned()
+}
+
 // Auto-run on library load
 #[used]
 #[link_section = ".init_array"]
@@ -108,4 +130,11 @@ static INIT: unsafe extern "C" fn() = init;
 
 unsafe extern "C" fn init() {
     eprintln!("libborealis loaded");
+
+    let module = find_main_module().unwrap();
+
+    let ask_offset = 0x614C0;
+    let ask_addr = (module.base + ask_offset) as *mut u8;
+
+    write_rel_jump(ask_addr, ask as *const u8);
 }
